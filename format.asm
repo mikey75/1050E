@@ -128,7 +128,7 @@ fill	sta	sekbuf,x
 	mva	#0 track
 f1	bit	status_register
 	bmi	ferror	; door open
-;	bvs	ferror	; write protect
+	bvs	ferror	; write protect
 	jsr	tmoton
 
 	ldy	#$c0
