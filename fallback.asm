@@ -88,20 +88,19 @@ chksumerr		lda	status
 			rts
 
 go_putmem;rombank #0
-			jsr put_memory
+			jsr 	put_memory
 			rts
 
 go_run	;rombank #0
-			jsr run_memory
+			jsr 	run_memory
 			rts
 
-drvnr			.byte $33,$32,$34,$31,$ff,$00
+drvnr			.byte 	$33,$32,$34,$31,$ff,$00
+cmds			.byte 	$f0,$f2
+cmds_len		equ 	(*-cmds)
 ;
-cmds			dta b($f0),b($f2)
-cmds_len		equ (*-cmds)
-;
-lows			dta l(go_putmem),l(go_run)
-highs			dta h(go_putmem),h(go_run)
+lows			.byte <go_putmem, <go_run ;dta l(go_putmem),l(go_run)
+highs			.byte >go_putmem, >go_run ;dta h(go_putmem),h(go_run)
 
 
 put_memory		bit 	daux1
@@ -126,6 +125,7 @@ dalej			jsr	send_ack
 
 			mva	#0 count
 			jsr	read_from_serial
+
 			wait900us
 ;
 			bit	error
@@ -140,8 +140,8 @@ errrr;			status_cksum_err
 			rts
 ; run program @adr in ram
 ; daux1,daux2 = lsb,msb
-run_memory		jsr send_ack 
-			jmp (daux1)
+run_memory		jsr 	send_ack 
+			jmp 	(daux1)
 			rts
 
 ; stock serial routine 

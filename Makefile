@@ -50,3 +50,5 @@ flash:
 burn: all
 	sudo ./sioflash main.o flasher.o
 
+compare:
+	@cmp -l main.o orig/1050E.bin >/dev/null || echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!! NOT SAME !!!!!!!!!!!!!!"
