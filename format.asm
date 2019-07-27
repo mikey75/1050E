@@ -123,10 +123,10 @@ fill			sta	sekbuf,x
 			mva	#0 track
 f1			bit	status_register
 			bmi	ferror	; door open
-;			bvs	ferror	; write protect
+			bvs	ferror	; write protect
 			jsr	tmoton
 
-			ldx	#$c0
+			ldy	#$c0
 			jsr	delay3
 
 			lda	#1
@@ -137,7 +137,7 @@ f1			bit	status_register
 			lda	error
 			bne	ferror
 
-			ldx	#$c0
+			ldy	#$c0
 			jsr	delay3
 
 			lda	#1
@@ -147,7 +147,7 @@ f1			bit	status_register
 			jsr	write_track
 			bne	ferror
 
-			ldx	#$c0
+			ldy	#$c0
 			jsr	delay3
 
 			lda	#1

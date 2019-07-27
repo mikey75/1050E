@@ -1,7 +1,7 @@
 MADS=mads -l -u -t
-DEBUGFLAGS=Z
+DEBUGFLAGS=NONE
 
-all: clean main.o flasher.o compare
+all: clean main.o flasher.o 
 
 FILES=  main.asm  \
 	time.asm \
