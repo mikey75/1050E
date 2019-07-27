@@ -1,56 +1,43 @@
-;
-; $Id: status.asm,v 1.3 2013/01/18 01:53:39 mikey Exp $
-;
+send_status		wait300us
+			jsr	send_ack
+			jsr	dforce
 
-;
-; 0x53 - send status to atari
-;
-send_status
+			; TODO - if door open, return status of a romdisk (when done)
+			; TODO - return write protect bit		
 
-	wait300us
-	jsr	send_ack
-	jsr	dforce
+			lda	status_register
+			sta	status+1
 
-	; if door open, return status of a romdisk
-	; TODO - return write protect bit
+			lda	#$e0
+			sta	status+2
 
-	lda	status_register
-	sta	status+1
+			lda	#0
+			sta	status+3
+			sta	error
 
-	lda	#$e0
-	sta	status+2
+;			jsr	send_ack
 
-	lda	#0
-	sta	status+3
-	sta	error
+			wait300us
+			jsr	send_compl
+    
+		    	lda	#4
+			sta	count
 
-;	jsr	send_ack
+			lda	<status 
+			sta	where
+			lda	>status
+			sta	where+1
+			jsr	send_to_serial
 
-	wait300us
-	jsr	send_compl
+		    	lda	#$53		; no error, return $53 so that main handler does not update status after status ;)
+			rts
 
-	lda	#4
-	sta	count
-
-	lda	<status 
-	sta	where
-	lda	>status
-	sta	where+1
-	jsr	send_to_serial
-
-	lda	#$53		; no error, return $53 so that main handler does not update status after status ;)
-	rts
-;
-; 0x3F - send pokey divisor to atari
-;
-send_divisor
-
-	jsr	send_ack
-	wait300us
-	jsr	send_compl
-	lda	#6
-	jsr	sendbyte
-	lda 	#6
-	jsr	sendbyte
-	lda	#0
-	rts
+send_divisor		jsr	send_ack
+			wait300us
+			jsr	send_compl
+			lda	#6		; 26.07.2019 - czemu 2 razy???
+			jsr	sendbyte	
+			lda 	#6
+			jsr	sendbyte
+			lda	#0
+			rts

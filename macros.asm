@@ -67,21 +67,21 @@
 ; drq x,y -> multiple bytes drq (x = count, y = byte)
 .macro 			drq
 
-	    ift :0 = 1	
+		    ift :0 = 1	
 			lda	:1
 		    	bit	porta
 			bpl	*-3
 			sta	data_register
-	    eif
+		    eif
 
-	    ift :0 = 2	
+	    	    ift :0 = 2	
 			lda	:2
 			ldx	:1
-?_dq			bit	porta
-			bpl	?_dq
+?dq			bit	porta
+			bpl	?dq
 			sta	data_register
 			dex
-			bne	?_dq
-	    eif
+	    		bne	?dq
+		    eif
 .endm
 

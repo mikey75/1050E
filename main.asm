@@ -1,222 +1,214 @@
+;	  _  ___  ____   ___       
+;	 / |/ _ \| ___| / _ \  ___ 
+;	 | | | | |___ \| | | |/ _ \
+;	 | | |_| |___) | |_| |  __/
+;	 |_|\___/|____/ \___/ \___|
+;                          
+; 1050E Hardware by Sebastian Bartkowicz (Candle) - http://spiflash.org
+; 1050E firmware by Michal Szwaczko (Mikey) - http://m.wirelabs.net
 ;
-; $Id: main.asm,v 1.4 2013/01/19 00:23:03 mikey Exp $
+; Firmware Copyright (c) 2010-2012,2013,2019 Michal Szwaczko
 ;
-	icl 	'wormfood.asm'			; usual wormfood :)
+			icl 	'wormfood.asm'		; usual wormfood :)
+		    	opt	h- f+ o+
 
-	opt	h- f+ o+
-	org 	$f000,$0000
+; ============================= BANK 0 ==================================
 
-; 	bank 0
+			org 	$f000,$0000		; bank 0
 
-	icl	'fallback.asm'		; fallback minimal code to flash drive if main code toasted
-	icl	'sector.asm'
-	icl	'status.asm'
-	icl	'hwinit.asm'
+			icl	'fallback.asm'		; fallback minimal code to flash drive if main code toasted
+    			icl	'sector.asm'
+			icl	'status.asm'
+			icl	'hwinit.asm'
 
-;!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-;!!!!!!  anything that can fuck up the fallback or ability to flash drive should be below this line !!!!
-;!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+			ert	* >$f7ff
 
-	ert	* >$f7ff
+; ============================== BANK 1 ==================================
 
-; 	bank 1
+			org	$f800,$0800
 
-	org	$f800,$0800	; assembly adres, rom offset
+mainloop		lda	#2
+			sta	rombank_select
+			jsr	dskchg		; returns if door status didn't change
+			jsr	wait4cmd	; returns if no cmd line low
 
-mainloop
+			lda	porta 		; motor on?
+			and	#8 
+			bne	mainloop	; no, loop without timer
 
-	; set turrbo flag - initial is slow
+			ldx	#2		; yes, delay
+			dex 
+			bne	*-1 
 
+			inw	motor_timer
+			bne	mainloop
+			jsr	motor_off		; if timer expires, stop motor
+			jmp	mainloop
 
-	lda	#2
-	sta	rombank_select
-	jsr	dskchg		; returns if door status didn't change
-	jsr	wait4cmd	; returns if no cmd line low
+wait4cmd		lda	#2
+			bit	portb
+			bne	ret
+			bmi	*+3 ;readcommand
+ret			rts
 
-	lda	porta 		; motor on?
-	and	#8 
-	bne	mainloop	; no, loop without timer
+; read command
 
-	ldx	#2		; yes, delay
-	dex 
-	bne	*-1 
+			mva	#$bf modifier	; for speedsio need to tell command from data when doing bitbang
+			mwa 	#cmd_frame where
+			mva	#4 count
+			jsr	read_from_serial
 
-	inw	motor_timer
-	bne	mainloop
-	jsr	motor_off		; if timer expires, stop motor
-	jmp	mainloop
+			bit	portb		 ; wait until command high
+			bmi	*-3
 
-wait4cmd
+			bit	error
+			bvs	chksumerr
+			mva	#$3f modifier
 
-	lda	#2
-	bit	portb
-	bne	ret
-	bmi	*+3 ;readcommand
-ret	rts
+; indicate no checksum error to status
 
-	; read command
+			lda	status
+			and	#%11111101
+			sta	status
 
-	mva	#$bf modifier	; for speedsio need to tell command from data when doing bitbang
-	mwa 	#cmd_frame where
-	mva	#4 count
-	jsr	read_from_serial
+			lda	porta
+			and	#3
+			tax
+			lda	drvnr,x
+			cmp	dunit
+			bne	notme
 
+; search the command in the command table 
+	
+			ldx	#0
+search			lda	tab,x
+			beq	unknown		; thats end of table condition, not notme condition
+			cmp	dcommand
+			beq	execute
+			inx
+			inx
+			inx
+			inx
+			bne	search		;jmp
 
-	bit	portb		 ; wait until command high
-	bmi	*-3
+; indicate command unrecognized to status
 
-	bit	error
-	bvs	chksumerr
-	mva	#$3f modifier
+unknown			lda	status
+			ora	#1
+			sta	status
+			jsr	send_nak
+notme			rts
 
-	; indicate no checksum error to status
+; execute command 
 
-	lda	status
-	and	#%11111101
-	sta	status
+execute			cmp	#$53		; if command was status dont indicate
+			beq	_e0
 
-	lda	porta
-	and	#3
-	tax
-	lda	drvnr,x
-	cmp	dunit
-	bne	notme
+; indicate command recognized to status
 
-	; search the command in the command table 
+			lda	status
+			and	#%11111110
+			sta	status
 
-	ldx	#0
-search	lda	tab,x
-	beq	unknown		; thats end of table condition, not notme condition
-	cmp	dcommand
-	beq	execute
-	inx
-	inx
-	inx
-	inx
-	bne	search		;jmp
+_e0			lda	tab+1,x
+			sta	rombank_select 
 
-	; indicate command unrecognized to status
+			lda	tab+2,x
+			sta	jumper
+			lda	tab+3,x
+			sta 	jumper+1
 
-unknown	lda	status
-	ora	#1
-	sta	status
-	jsr	send_nak
-notme	rts
+; setup return address from handlers so that rts from the handler will always come back here 
 
-	; execute command 
+			lda	>(_e1-1)
+			pha
+			lda	<(_e1-1)
+			pha
+			jmp	(jumper)
 
-execute
+_e1		    	bne	_e2	; all command handlers return with A=0 or A=1, 1 means there was an error 
 
-	cmp	#$53		; if command was status dont indicate
-	beq	_e0
+			lda	status
+			and	#%11111011
+			sta	status
+			rts
 
-	; indicate command recognized to status
+_e2			cmp	#$53		; status returns with this code so we dont update anything
+			beq	_e3
 
-	lda	status
-	and	#%11111110
-	sta	status
+			lda	status		; indicate error to status
+			ora	#%00000100
+			sta	status
+_e3			rts
 
-_e0	lda	tab+1,x
-	sta	rombank_select 
+chksumerr		lda	turbo_flag 	; toggle ultraspeed 
+			eor	#$ff
+			sta	turbo_flag
 
-	lda	tab+2,x
-	sta	jumper
-	lda	tab+3,x
-	sta 	jumper+1
+; indicate chcksum error to status
 
-	; setup return address from handlers so that rts from the handler will always come back here 
-
-	lda	>(_e1-1)
-	pha
-	lda	<(_e1-1)
-	pha
-	jmp	(jumper)
-
-_e1    	bne	_e2	; all command handlers return with A=0 or A=1, 1 means there was an error 
-
-	lda	status
-	and	#%11111011
-	sta	status
-	rts
-
-_e2	cmp	#$53		; status returns with this code so we dont update anything
-	beq	_e3
-
-	lda	status		; indicate error to status
-	ora	#%00000100
-	sta	status
-_e3	rts
-
-chksumerr
-
-	; toggle ultraspeed 
-	lda	turbo_flag
-	eor	#$ff
-	sta	turbo_flag
-
-	; indicate chcksum error to status
-	lda	status
-	ora 	#2
-	sta	status
-
-	rts
+			lda	status
+			ora 	#2
+			sta	status
+			rts
 
 ; command handlers jump table
 
-tab	JMPENTRY $53,0,send_status
-	JMPENTRY $52,0,read_sector
-	JMPENTRY $3f,0,send_divisor
-	JMPENTRY $50,0,write_sector
-	JMPENTRY $4f,2,receive_percom
-	JMPENTRY $4e,2,send_percom
-	JMPENTRY $22,2,format_enh
-	JMPENTRY $21,2,format
-	JMPENTRY $66,2,custom_format
-	JMPENTRY $0,0,0
+tab			JMPENTRY $53,0,send_status
+			JMPENTRY $52,0,read_sector
+			JMPENTRY $3f,0,send_divisor
+			JMPENTRY $50,0,write_sector
+			JMPENTRY $4f,2,receive_percom
+			JMPENTRY $4e,2,send_percom
+			JMPENTRY $22,2,format_enh
+			JMPENTRY $21,2,format
+			JMPENTRY $66,2,custom_format
+			JMPENTRY $0,0,0
 
 ; legal drive numbers 
 
-drvnr	.byte $33,$32,$34,$31
+drvnr			.byte $33,$32,$34,$31
 
 ; these are core modules, must be accessible from any bank so they must be here
 
-	icl	'time.asm'
-	icl 	'serial.asm'
-	icl	'serial-fast.asm'
-	icl	'motor.asm'
+			icl	'time.asm'
+			icl 	'serial.asm'
+			icl	'serial-fast.asm'
+			icl	'motor.asm'
 
 ; IRQ handler for BRK - cycles motor on / motor off to signal that the drive has hanged
 
-irq	lda	#2
-	sta	ztmp
-	jsr 	motor_on
-	ldx	#10
-	jsr	delay2
-	jsr	motor_off
-	ldx	#10
-	jsr	delay2
-	jsr	motor_on
-	dec	ztmp
-	bne	irq
+irq			lda	#2
+			sta	ztmp
+			jsr 	motor_on
+			ldx	#10
+			jsr	delay2
+			jsr	motor_off
+			ldx	#10
+			jsr	delay2
+			jsr	motor_on
+			dec	ztmp
+			bne	irq
 
-	ert * > $fff0 
+			ert 	* > $fff0 
 
-	org	$fffc,$0ffc
-	.word 	start
-	.word 	irq
+			org	$fffc,$0ffc
+
+			.word 	start
+			.word 	irq
 
 
 ;-------------------------- end of system address space --------------------------;
 
 ; bank  2
 
-	org 	$1000,$1000
+			org 	$1000,$1000
 
-	icl	'format.asm'
-	icl	'percom.asm'
-	icl	'id_disk.asm'
+			icl	'format.asm'
+			icl	'percom.asm'
+			icl	'id_disk.asm'
 
-	.ifdef  RELEASE
-	dta 	c'$Id: main.asm,v 1.4 2013/01/19 00:23:03 mikey Exp $'
-	dta	c'Copyright WireLabs Technologies, and Michal Szwaczko'
-	.endif
+			.ifdef  RELEASE
+			dta 	c'1050E firmware by mikey'
+			dta	c'1050E hardware by candle'
+			.endif

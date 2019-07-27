@@ -1,10 +1,8 @@
-;
-; $Id: hwinit.asm,v 1.3 2013/01/19 00:23:03 mikey Exp $
-;
 
-fail	brk
+fail			brk
 
-; init stack and clear decimal
+			; 6502 startup
+
 start	    		cld
 			ldx	#$ff
 			txs
@@ -31,42 +29,31 @@ start	    		cld
 
 			; fdc tests
 			fdc	#forceirq
-
 			ldx 	#$15
 			dex
 			bne 	*-1
-
 			lda	status_register 
 			and	#1 
 			bne	fail
-
 			lda	#$55 
 			sta	track_register
 			sta	sector_register
-
 			ldx	#$1e
 		    	dex
 		    	bne 	*-1
-
 		    	eor	track_register
 			bne	fail
-
 			lda	#$55
 			eor	sector_register
 			bne	fail
-
 			fdc	#$48	;step in, head load, steprate
-
 			ldx	#$28
 			jsr	delay1
-
 			lda	status_register
 			and	#1 
 			beq	fail
-
 	    		ldx	#$28
 			jsr	delay1
-
 			lda	status_register 
 			and	#1 
 			bne	fail
@@ -81,14 +68,14 @@ start	    		cld
 
 			lda	#0
 			tax
-?zozo			sta	$000,x
+clrram			sta	$000,x
 			sta	$100,x
 			sta	$200,x
 			sta	$300,x
 			sta	$400,x
 			sta	$500,x
 			inx
-			bne	?zozo
+			bne	clrram
 
 			lda 	#0
 			sta 	turbo_flag

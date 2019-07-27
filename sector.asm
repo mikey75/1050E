@@ -1,7 +1,3 @@
-;
-; $Id: sector.asm,v 1.2 2013/01/18 01:53:39 mikey Exp $
-;
-
 wrsector		sta	sector_register
 
 _ws1			ldx	#0

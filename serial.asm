@@ -1,12 +1,5 @@
-;
-; $Id: serial.asm,v 1.4 2013/01/19 00:23:03 mikey Exp $
-;
-
 sendbyte_fast_tramp	jmp	fast.sendbyte
-;---------------------------------------------------------------
-; sendbyte - send a byte to serial 
-;
-;			.align $100,$ff
+
 sendbyte		pha
 			lda	turbo_flag
 			bne	sendbyte_fast_tramp
@@ -106,8 +99,8 @@ err1			pla
 ; number of bytes in count/buffer address in where/where+1
 ; $80 for 128B, $0 for 256. 
 
-read_from_serial	lda turbo_flag
-			bne read_fast_tramp
+read_from_serial	lda 	turbo_flag
+			bne 	read_fast_tramp
 
 			timeout #$ff		;lda	#$ff
 
