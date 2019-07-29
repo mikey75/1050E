@@ -1,5 +1,5 @@
 MADS=mads -l -u -t
-DEBUGFLAGS=NONE
+DEBUGFLAGS=RELEASE
 
 all: clean main.o flasher.o 
 
